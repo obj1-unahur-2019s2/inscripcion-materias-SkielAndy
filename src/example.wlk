@@ -1,93 +1,133 @@
+class Estudiante {
 
-class Estudiante{
-	var aprobaciones= []
-	var carreras=[]
-	var inscripciones=[]
-	method registrarAprobacion(materia,nota){
-		if(not aprobaciones.any({aprob=>aprob.materia()==materia}) ){
-			aprobaciones.add(new Aprobacion(nota=nota,materia=materia))
-		}
-		else{self.error("Ya esta aprobada")}	
-	}
-	method materiasDeLasCarrerasInscripto(){
-		return carreras.flatMap({car=>car.materias()})
-	}
-	method materiasAprobadas(){
-		return aprobaciones.map({aprob=>aprob.materia()})
-	}
-	method cantDeMateriasAprobadas(){
-		return self.materiasAprobadas().size()
-	}
-	method promedio(){
-		var notas=aprobaciones.map({aprob=>aprob.nota()})
-		return notas.sum() / self.cantDeMateriasAprobadas()
-	}
-	method estaEnSuCarrera(materia){
-		return self.materiasDeLasCarrerasInscripto().contains(materia)
-	}
-	method aprobo(materia){
-		return self.materiasAprobadas().contains(materia)
-	}	
-	method noEstaInscripto(materia){
-		return not inscripciones.contains(materia)
-	}
-	method mapDeRequisitos(materia){
-		return materia.requisitos()
-	}
-	method cumpleLosRequisitos(materia){
-		return self.mapDeRequisitos(materia).all({
-			e=> e.aprobo(materia)})
-	}
-	method puedeInscribirseA(materia){
-		return self.estaEnSuCarrera(materia) and
-			not self.aprobo(materia) and self.noEstaInscripto(materia) and 
-			self.cumpleLosRequisitos(materia)
-	}
-	method cupoOLista(materia,estudiante){
-		if (materia.cupos().size() <30){
-			materia.cupos().add(estudiante)
-			inscripciones.add(materia)
-		}else{
-			materia.listaDeEspera().add(estudiante)
+	var aprobaciones = []
+	var carreras = []
+
+	method registrarAprobacion(materia, nota) {
+		if (not aprobaciones.any({ aprob => aprob.materia() == materia})) {
+			aprobaciones.add(new Aprobacion(nota = nota, materia = materia))
+		} else {
+			self.error("Ya está aprobada")
 		}
 	}
-	method incribirA_A(estudiante,materia){
-		if (self.puedeInscribirseA(materia)){
-			self.cupoOLista(materia,estudiante)
-		}else{self.error("No se cumplen las condiciones")}
+
+	method materiasDeLasCarrerasInscripto() {
+		return carreras.flatMap({ car => car.materias() })
 	}
-	
+
+	method inscribirseACarrera(carrera) {
+		carreras.add(carrera)
+	}
+
+	method estaAprobada(materia) {
+		return aprobaciones.any({ aprob => aprob.materia() == materia })
+	}
+
+	method cantMateriasAprobadas() {
+		return aprobaciones.size()
+	}
+
+	method promedio() {
+		return aprobaciones.sum({ aprob => aprob.nota() }) / self.cantMateriasAprobadas()
+	}
+
+	method puedeInscribirse(materia) {
+		return self.materiasDeLasCarrerasInscripto().contains(materia) and not self.estaAprobada(materia) and not materia.estudiantesInscriptos().contains(self) and not materia.listaDeEspera().contains(self) and materia.requisitos().all({ mat => self.estaAprobada(mat) })
+	}
+
+	method inscribirseA(materia) {
+		if (self.puedeInscribirse(materia)) {
+			materia.inscribirEstudiante(self)
+		} else {
+			self.error("No se pudo inscribir")
+		}
+	}
+
+	method materiasInscripto() {
+		return self.materiasDeLasCarrerasInscripto().filter({ materia => materia.estudiantesInscriptos().contains(self) })
+	}
+
+	method todasLasMaterias() {
+		return carreras.map({ carrera => carrera.materias() }).flatten()
+	}
+
+	method puedeCursar(materia) {
+		return self.materiaEstaEnCarrerasQueEstoyCursando(materia) and not self.tieneAprobada(materia) and not self.estaInscripto(materia) and self.tieneTodosLosRequisitos(materia)
+	}
+
+	method inscribir(materia) {
+		if (not self.puedeCursar(materia)) {
+			self.error("no puedo cursar")
+		}
+		materia.anotar(self)
+	}
+
+	method tieneTodosLosRequisitos(materia) {
+		return materia.requisitos().all({ req => self.tieneAprobada(req) })
+	}
+
+	method materiaEstaEnCarrerasQueEstoyCursando(materia) {
+		return self.todasLasMaterias().contains(materia)
+	}
+
+	method tieneAprobada(materia) {
+		return aprobaciones.any({ matApr => matApr.materia() == materia })
+	}
+
+	method tieneAprobada_variante(materia) {
+		var matAprobadas = aprobaciones.map({ apr => apr.materia() })
+		return matAprobadas.contains(materia)
+	}
+
+	method estaInscripto(materia) {
+		return materia.inscriptos().contains(self)
+	}
+
 }
 
-class Aprobacion{
-//se necesita la clase aprobacion porque exite una relacion de muchos a muchos
+class Materia {
+
+	var property requisitos = []
+	var property estudiantesInscriptos = []
+	var property listaDeEspera = []
+	var property cantidadMaximaDeEstudiantes
+
+	method correlativa(materia) {
+		requisitos.add(materia)
+	}
+
+	method inscribirEstudiante(estudiante) {
+		if (estudiantesInscriptos.size() <= cantidadMaximaDeEstudiantes) {
+			estudiantesInscriptos.add(estudiante)
+		} else {
+			listaDeEspera.add(estudiante)
+		}
+	}
+
+	method darDeBaja(estudiante) {
+		estudiantesInscriptos.remove(estudiante)
+		if (not listaDeEspera.isEmpty()) {
+			estudiantesInscriptos.add(listaDeEspera.head())
+			listaDeEspera.remove(listaDeEspera.head())
+		}
+	}
+
+}
+
+class Aprobacion {
+
 	var property nota
 	var property materia
+
 }
-class Materia{
-	var property requisitos=[]//guarda una lista de materias
-	var property cupos=[]
-	var property listaDeEspera=[]
-	
-	method enQueListaEsta(estudiante,materia){
-		if (materia.cupos().contains(estudiante)){
-			materia.cupos().remove(estudiante)
-			if (not materia.listaDeEspera().isEmpty()){
-				materia.cupos().add(materia.listaDeEspera().first())
-				materia.listaDeEspera().remove(materia.listaDeEspera().first())
-			}
-		}else{
-			materia.listaDeEspera().remove(estudiante)
-		}
+
+class Carrera {
+
+	var property materias = []
+
+	method registrar(materia) {
+		materias.add(materia)
 	}
-	method darDeBaja(materia,estudiante){
-	    if(not estudiante.noEstaInscripto()){
-	    	self.enQueListaEsta(estudiante, materia)
-	    }else{
-	    	self.error("no esta inscripto en la materia")
-	    }
-	}
-	method resultadosDeInscripcion(materia){
-		return materia.cupos() + materia.listaDeEspera()
-	}
+
 }
+
